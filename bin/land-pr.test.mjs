@@ -124,7 +124,7 @@ test('says which step of making its temporary repository failed, and runs nothin
   writeFileSync(join(bin, 'git'), `#!/bin/sh\n[ "$1" != init ] || exit 128\nexec '${realCommand('git')}' "$@"\n`, {mode: 0o755});
   const tmp = join(r.root, 'tmp');
   mkdirSync(tmp);
-  const noInit = r.landPr(r.wrapper, ['42'], {TMPDIR: tmp, PATH: `${bin}:${r.env.PATH ?? process.env.PATH}`});
+  const noInit = r.landPr(r.wrapper, ['42'], {TMPDIR: tmp, PATH: `${bin}:${r.env.PATH}`});
   assert.equal(noInit.status, 1);
   assert.match(noInit.stderr, new RegExp(`land-pr: cannot create a temporary repository in ${tmp}/[^ ]+; nothing ran`));
   assert.deepEqual(readdirSync(tmp), [], 'the temporary directory is removed');
