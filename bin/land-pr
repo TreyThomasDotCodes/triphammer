@@ -23,10 +23,13 @@ main() {
   url="$(git -C "$triphammer" remote get-url origin)" \
     || { echo "land-pr: $triphammer has no origin; nothing ran" >&2; exit 1; }
 
-  main_git="$(mktemp -d)" || { echo "land-pr: cannot create a temporary directory; nothing ran" >&2; exit 1; }
+  main_git="$(mktemp -d)" \
+    || { echo "land-pr: cannot create a temporary directory under ${TMPDIR:-/tmp}; nothing ran" >&2; exit 1; }
   trap 'rm -rf "$main_git"' EXIT
-  { git init -q --bare "$main_git" && git -C "$main_git" fetch -q "$url" +refs/heads/main:refs/remotes/origin/main; } \
-    || { echo "land-pr: cannot fetch main from $url; nothing ran" >&2; exit 1; }
+  git init -q --bare "$main_git" \
+    || { echo "land-pr: cannot create a temporary repository in $main_git; nothing ran" >&2; exit 1; }
+  git -C "$main_git" fetch -q "$url" +refs/heads/main:refs/remotes/origin/main \
+    || { echo "land-pr: cannot fetch main from $url into $main_git; nothing ran" >&2; exit 1; }
   if ! git -C "$main_git" show refs/remotes/origin/main:bin/land-pr 2>/dev/null | cmp -s - "$self"; then
     # The direct command for this directory: plain when its origin is Triphammer's, as in Triphammer's checkout or a
     # run's clone of it, with main fetched into a temporary repository when the project is another repository.

@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {fakeGh, git, here, lines, checkoutSetup, runClone} from './fixture.mjs';
+import {fakeGh, git, here, lines, checkoutSetup, realCommand, runClone} from './fixture.mjs';
 
 const wrapper = readFileSync(join(here, 'land-pr'), 'utf8');
 
@@ -108,6 +108,33 @@ test('rejects a missing or extra argument and runs nothing', t => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /usage: land-pr <pull request number>/);
   }
+  assert.deepEqual(r.landed(), []);
+});
+
+test('says which step of making its temporary repository failed, and runs nothing', t => {
+  const r = landSetup(t);
+  const missing = join(r.root, 'no-such-tmp');
+  const noTmp = r.landPr(r.wrapper, ['42'], {TMPDIR: missing});
+  assert.equal(noTmp.status, 1);
+  assert.match(noTmp.stderr, new RegExp(`land-pr: cannot create a temporary directory under ${missing}; nothing ran`));
+
+  // A git first on PATH whose init fails, as it does when the temporary directory's volume is out of quota.
+  const bin = join(r.root, 'failing-git');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'git'), `#!/bin/sh\n[ "$1" != init ] || exit 128\nexec '${realCommand('git')}' "$@"\n`, {mode: 0o755});
+  const tmp = join(r.root, 'tmp');
+  mkdirSync(tmp);
+  const noInit = r.landPr(r.wrapper, ['42'], {TMPDIR: tmp, PATH: `${bin}:${r.env.PATH ?? process.env.PATH}`});
+  assert.equal(noInit.status, 1);
+  assert.match(noInit.stderr, new RegExp(`land-pr: cannot create a temporary repository in ${tmp}/[^ ]+; nothing ran`));
+  assert.deepEqual(readdirSync(tmp), [], 'the temporary directory is removed');
+
+  const gone = join(r.root, 'gone.git');
+  git(r.checkout, 'remote', 'set-url', 'origin', gone);
+  const noFetch = r.landPr(r.wrapper, ['42'], {TMPDIR: tmp});
+  assert.equal(noFetch.status, 1);
+  assert.match(noFetch.stderr, new RegExp(`land-pr: cannot fetch main from ${gone} into ${tmp}/[^ ]+; nothing ran`));
+  assert.deepEqual(readdirSync(tmp), []);
   assert.deepEqual(r.landed(), []);
 });
 
