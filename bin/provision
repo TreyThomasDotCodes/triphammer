@@ -36,9 +36,7 @@
 # that fails exits 1 naming it, and a later run carries on from there. --dry-run prints each change it would make
 # (`would: ...`) and makes none.
 #
-# It leaves the rootful Docker Engine installed and running; only root and the docker group reach its socket. It leaves
-# alone the one rootless daemon, `<user>-docker`, that every Docker project shared before each had its own: its user,
-# unit and socket stay, and no project uses it (bin/README.md says how the owner removes it).
+# It leaves the rootful Docker Engine installed and running; only root and the docker group reach its socket.
 #
 # Tests (provision.test.mjs) run it with fakes of the package and account tools first on PATH (bin/provision-lib.sh).
 # shellcheck disable=SC2016  # the sh -c and bash -c scripts expand their own arguments, not this shell's
@@ -327,8 +325,7 @@ fi
 user_plugin humanizer blader/humanizer humanizer
 
 # The machine file, for provision-project and the triphammer command, with every line it does not set kept (the Docker
-# projects' daemons provision-project names, and the TRIPHAMMER_DOCKER_USER and TRIPHAMMER_DOCKER_SOCKET of the daemon
-# every Docker project shared before each had its own, whose socket the write limit hides), and the command itself: a
+# projects' daemons provision-project names), and the command itself: a
 # copy of this script's own bin/triphammer that root owns, never a link into the checkout the service user may write.
 root_file "$machine_file" 644 "$(machine_with "TRIPHAMMER_REPO=$tri_repo" "TRIPHAMMER_CHECKOUT=$tri_checkout" \
   "TRIPHAMMER_USER=$user" "TRIPHAMMER_HOME=$home")"$'\n'

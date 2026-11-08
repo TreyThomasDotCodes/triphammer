@@ -11,8 +11,8 @@
 # `docker run --rm busybox true` must work, so a refusal below is the daemon's and not a missing image or daemon. Then
 # a container that mounts / (`docker run --rm -v /:/host busybox sh -c 'touch /host<home>/docker-probe-...'`), and the
 # same one privileged, must not create the file in the service user's home ($HOME); `docker -H <socket> info` must
-# fail under the write limit for each other rootless daemon's socket the machine file names (rootless_docker_sockets:
-# the other Docker projects', and the one they all shared before each had its own); and `docker -H
+# fail under the write limit for each other Docker project's rootless daemon socket the machine file names
+# (rootless_docker_sockets); and `docker -H
 # unix:///var/run/docker.sock info`, the rootful daemon, must fail, both inside the limit and outside it. It prints
 # PASS or FAIL for each, removes any file a container created, and exits 0 when every check passes, 1 otherwise and 2
 # without a project. It pulls busybox into the project's daemon's images when they lack it.

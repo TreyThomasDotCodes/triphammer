@@ -132,19 +132,15 @@ test('add, as an ordinary user, asks sudo once, runs a fresh clone\'s provision-
   assert.equal(result.status, 0, result.stderr);
   const calls = s.calls();
   assert.equal(calls[0], 'sudo -v');
-  // The configs are read, as the service user, before provision-project runs.
-  const service = 'sudo -iu triphammer env XDG_RUNTIME_DIR=/run/user/1001';
-  assert.deepEqual(calls.slice(1, 3), [`${service} ls -1 ${s.home}/.config/triphammer`,
-    `${service} sed -n s/^REPO=//p ${s.home}/.config/triphammer/example-project.conf`]);
   // Each step runs under the script (bash -c '<script>' detached <step...>) that gives it a session of its own.
   const step = call => call.replace(/ bash -c .*setsid .* detached /, ' <session> ');
-  assert.match(step(calls[3]), new RegExp(`^sudo <session> bash ${s.tmp}/tmp\\.\\w+/triphammer/bin/provision-project example/example-project --modules demo --set DEMO_URL=http://x\\.invalid/$`));
-  assert.equal(calls[4], 'provision-project sudo=yes example/example-project --modules demo --set DEMO_URL=http://x.invalid/');
-  assert.equal(step(calls[5]), `sudo -iu triphammer env XDG_RUNTIME_DIR=/run/user/1001 <session> env TRIPHAMMER_PROJECT=example-project ${s.home}/.local/bin/ticket-runner --labels`);
-  assert.equal(calls[6], 'ticket-runner project=example-project runtime=/run/user/1001 --labels');
-  assert.equal(step(calls[7]), `sudo -iu triphammer env XDG_RUNTIME_DIR=/run/user/1001 <session> env TRIPHAMMER_PROJECT=example-project ${s.home}/.local/bin/ticket-runner --doctor --before-start`);
-  assert.equal(calls[8], 'ticket-runner project=example-project runtime=/run/user/1001 --doctor --before-start');
-  assert.equal(calls.length, 9);
+  assert.match(step(calls[1]), new RegExp(`^sudo <session> bash ${s.tmp}/tmp\\.\\w+/triphammer/bin/provision-project example/example-project --modules demo --set DEMO_URL=http://x\\.invalid/$`));
+  assert.equal(calls[2], 'provision-project sudo=yes example/example-project --modules demo --set DEMO_URL=http://x.invalid/');
+  assert.equal(step(calls[3]), `sudo -iu triphammer env XDG_RUNTIME_DIR=/run/user/1001 <session> env TRIPHAMMER_PROJECT=example-project ${s.home}/.local/bin/ticket-runner --labels`);
+  assert.equal(calls[4], 'ticket-runner project=example-project runtime=/run/user/1001 --labels');
+  assert.equal(step(calls[5]), `sudo -iu triphammer env XDG_RUNTIME_DIR=/run/user/1001 <session> env TRIPHAMMER_PROJECT=example-project ${s.home}/.local/bin/ticket-runner --doctor --before-start`);
+  assert.equal(calls[6], 'ticket-runner project=example-project runtime=/run/user/1001 --doctor --before-start');
+  assert.equal(calls.length, 7);
   assert.match(result.stdout, /sudo asks for your password once/);
   assert.match(result.stdout, /^setting it up$/m);
   assert.match(result.stdout, /Start it, once the doctor finds nothing missing: triphammer start example-project$/m);
@@ -197,44 +193,20 @@ test('add --dry-run creates no label and runs no doctor, and labels or a doctor 
   assert.match(result.stderr, /not every label Triphammer uses could be created; the doctor lists the missing ones/);
 });
 
-test('add of a second project, with --dry-run or without, exits 1 naming the machine\'s project and runs no provision-project', t => {
-  for (const args of [['example/other-project'], ['example/other-project', '--dry-run']]) {
-    const s = setup(t);
-    const before = s.config('example-project');
-    const result = s.run('add', ...args);
-    assert.equal(result.status, 1, `${args}: ${result.stderr}`);
-    assert.match(result.stderr, /^triphammer: this machine serves example-project already, and one machine serves one project; set example\/other-project up on a machine of its own \(bin\/README\.md, Several projects\)$/m);
-    assert.ok(!s.calls().some(call => /provision-project|ticket-runner/.test(call)), `${args}: ${s.calls()}`);
-    assert.deepEqual(s.config('example-project'), before);
-    assert.deepEqual(readdir(s.tmp), [], 'the clone was left behind');
-  }
-});
-
-test('add of the machine\'s own project, in another case, runs provision-project; a config without a REPO refuses', t => {
+test('add of a second project runs provision-project for it and leaves the first project\'s config as it was', t => {
   const s = setup(t);
-  assert.equal(s.run('add', 'Example/Example-Project').status, 0);
-  assert.ok(s.calls().includes('provision-project sudo=yes Example/Example-Project'));
-  const bad = setup(t, {projects: {'example-project': 'CHECKOUT=/srv/example-project\n'}});
-  const result = bad.run('add', 'example/example-project');
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /this machine serves example-project already/);
-  assert.ok(!bad.calls().some(call => call.startsWith('provision-project')));
+  const before = s.config('example-project');
+  const result = s.run('add', 'example/other-project');
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(s.calls().includes('provision-project sudo=yes example/other-project'));
+  assert.deepEqual(s.config('example-project'), before);
 });
 
-test('add refuses when the configs cannot be listed, and adds the first project on a machine without them', t => {
+test('add of the first project on a machine without configs runs provision-project', t => {
   const fresh = setup(t, {projects: {}});
   rmSync(join(fresh.home, '.config/triphammer'), {recursive: true});
   assert.equal(fresh.run('add', 'example/example-project').status, 0);
   assert.ok(fresh.calls().includes('provision-project sudo=yes example/example-project'));
-  if (process.getuid() === 0) return t.skip('root lists any directory');
-  const s = setup(t);
-  const configs = join(s.home, '.config/triphammer');
-  chmodSync(configs, 0o000);
-  const result = s.run('add', 'example/example-project');
-  chmodSync(configs, 0o755);
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /could not list .*\/\.config\/triphammer as triphammer, so which projects this machine has is unknown/);
-  assert.ok(!s.calls().some(call => call.startsWith('provision-project')));
 });
 
 test('without the machine file every command but usage exits 1 naming it', t => {

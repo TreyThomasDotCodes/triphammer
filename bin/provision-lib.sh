@@ -339,7 +339,7 @@ write_docker_unit() { write_root_file "$1" 644 "$2" && chown -- root:root "$1"; 
 
 # docker_daemon <project> <checkout>: the rootless Docker daemon of one project that declares "docker": true, which its
 # sessions alone reach, so no other project's session reaches its containers, images, volumes, networks or build
-# cache; that is no security boundary, as a machine serves one project (bin/README.md, Several projects). It runs as a
+# cache; that is no security boundary, as projects on one machine are not kept apart (bin/README.md, Several projects). It runs as a
 # user of its own, <user>-docker-<project>, in a user namespace on that user's subordinate ids, so
 # a container that mounts / or runs privileged acts as that user on the machine, and that user may read only the
 # project's run clones (docker_reads). It is in neither the service user's group nor the docker group. Its home, beside

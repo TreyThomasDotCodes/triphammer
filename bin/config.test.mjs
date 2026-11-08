@@ -61,11 +61,10 @@ test('machine_get prints nothing for a key the file leaves out, gives empty or n
   }
 });
 
-// Two Docker projects' daemons, the one daemon they shared before, and keys that name no plain absolute path.
+// Two Docker projects' daemons, a socket key with no project's name, and keys that name no plain absolute path.
 const dockerMachine = [
   'TRIPHAMMER_USER=triphammer',
-  'TRIPHAMMER_DOCKER_USER=triphammer-docker',
-  'TRIPHAMMER_DOCKER_SOCKET=/var/lib/triphammer-docker/docker.sock',
+  'TRIPHAMMER_DOCKER_SOCKET=/var/lib/no-project/docker.sock',
   'TRIPHAMMER_DOCKER_USER_EXAMPLE_PROJECT=triphammer-docker-example-project',
   'TRIPHAMMER_DOCKER_SOCKET_EXAMPLE_PROJECT=/var/lib/triphammer-docker-example-project/docker.sock',
   'TRIPHAMMER_DOCKER_SOCKET_OTHER=/var/lib/old/docker.sock',
@@ -103,10 +102,9 @@ test('docker_key maps lower-case names with dashes, and no other name', t => {
   }
 });
 
-test('rootless_docker_sockets lists every daemon the machine file names, the shared one of before included, each once', t => {
+test("rootless_docker_sockets lists each project's daemon the machine file names, each once", t => {
   const result = machineRun(t, dockerMachine, 'rootless_docker_sockets');
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, ['/var/lib/triphammer-docker/docker.sock',
-    '/var/lib/triphammer-docker-example-project/docker.sock', '/var/lib/triphammer-docker-other/docker.sock', ''].join('\n'));
+  assert.equal(result.stdout, ['/var/lib/triphammer-docker-example-project/docker.sock', '/var/lib/triphammer-docker-other/docker.sock', ''].join('\n'));
   assert.equal(machineRun(t, null, 'rootless_docker_sockets').stdout, '');
 });

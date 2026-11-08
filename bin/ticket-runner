@@ -61,7 +61,7 @@
 #   - closing an issue drops it;
 #   - an open issue labelled `stop-agents`, or the file `stop` in the state directory, pauses this project; the file
 #     `stop` in the shared directory pauses every project;
-#   - `systemctl --user stop ticket-runner.service` (or ticket-runner@<project>.service) ends the current session.
+#   - `systemctl --user stop ticket-runner@<project>.service` ends the current session.
 # The prompt names the builder the session briefs: triphammer:builder-light (Sonnet) for run 1 of an issue labelled
 # `light`, unless the owner restarted its counter, and triphammer:builder (Opus) for every other run. Each run that ends
 # leaves a record beside its transcript (write_record).
@@ -79,7 +79,7 @@
 # label retries from zero.
 set -euo pipefail
 # The state directory holds session transcripts, so everything the runner and its sessions create is private to the
-# service user, under systemd (UMask=0077 in ticket-runner.service) or not.
+# service user, under systemd (UMask=0077 in ticket-runner@.service) or not.
 umask 077
 
 bin="$(dirname "$(readlink -f "$0")")"

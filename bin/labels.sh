@@ -64,9 +64,9 @@ create_labels() {
 }
 
 # The owner's brakes outlive their labels and the issue's state: a session acts with the App's token, so whatever the
-# App sets brakes only while it is there, and whatever the App lifts stays on (bin/security-review-brief.md, boundary
-# 3). The functions below read who did what from the issue events API, where the App acts as <name>[bot]; each caller
-# sets $app_login to that login (event_login).
+# App sets brakes only while it is there, and whatever the App lifts stays on. This is best effort: a brake the App
+# lifts is not a finding (bin/security-review-brief.md, Not findings). The functions below read who did what from the
+# issue events API, where the App acts as <name>[bot]; each caller sets $app_login to that login (event_login).
 
 # event_login <app-author>: the App's login in the events API, from APP_AUTHOR: app/<name> acts as <name>[bot], and any
 # other author as itself.

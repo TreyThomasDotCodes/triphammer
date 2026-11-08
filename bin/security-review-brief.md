@@ -6,9 +6,14 @@ run unattended coding agents and merge their work. Review the area named at the 
 This is Triphammer's threat model. The copy of this file in the machine's main checkout is the one that counts, so a
 pull request cannot change the model it is reviewed against.
 
+Triphammer is one developer's tool. It runs on a machine of its own that the owner can rebuild with `install.sh` and
+`triphammer add`, for one or more of the owner's own projects. The model spends effort only where a session going
+wrong would cost more than rebuilding that machine: a merge that skipped its gate, or a credential that reaches past
+the machine. Everything else the owner handles by recovering (When a session goes wrong, below).
+
 How the workflow runs:
 
-- Each machine runs one project: `triphammer add` refuses a second, and the doctor reports a machine that has more.
+- The machine runs only Triphammer, for one or more of the owner's projects.
 - Unattended Claude Code agents run in auto mode, one session per issue or pull request, under the write limit of
   `bin/session-sandbox` and the guard hooks.
 - A session reaches GitHub as the agents' GitHub App, with the network open.
@@ -21,24 +26,18 @@ login on the machine. Exploiting a finding with any of those is out of scope.
 
 The attacker is whoever controls text or code a session reads: issue, pull request and review text, comments, branch
 names, commit messages, files in the repository, dependencies and their install scripts, web pages, and tool output. A
-session can also go wrong with no attacker at all. Assume the attacker controls a session completely: it runs any
-command the session can run and reads any file the session can read, the App's installation token included, which it
-can send over the network. It keeps what it leaves in every path the session can write.
+session can also go wrong with no attacker at all, which is the common case. Assume the attacker controls a session
+completely: it runs any command the session can run and reads any file the session can read, the App's installation
+token included, which it can send over the network. It keeps what it leaves in every path the session can write.
 
 What must hold even then. A way around one of these is a finding:
 
-1. Code outside the session: nothing a session writes runs outside its write limit, or in a later session, unless it
-   goes through a merged commit. This covers the runner, the units, `update-checkout`, `land-pr`, `merge-when-ready`,
-   the teardown, git's configs and hooks, the guard hooks, and the caches and state that later sessions read. Before and
-   after each session the runner removes the swarm membership, plugins, containers, volumes, networks, images and
-   build cache of its project's rootless Docker daemon (`sweep_daemon` in `bin/ticket-runner`; `bin/README.md`, Run
-   clones and databases nothing uses). It does not reset the daemon user's home or the daemon's config and unit there,
-   which a session's container can write (`bin/README.md`, Not covered).
+1. Code outside the session: nothing a session writes runs outside its write limit unless it goes through a merged
+   commit. This covers what holds the App's key or decides a merge: the runner, the units, `update-checkout`,
+   `land-pr`, `merge-when-ready`, and the git configs and hooks of the checkouts they run git in.
 2. Merges: a pull request merges only at the tier that the base branch's classifier and rules give it, and an
    escalated one only with the owner's approval of its current head.
-3. Brakes: a brake set by anyone other than the App stops the runner and `merge-when-ready` until someone other than
-   the App lifts it, even when the attacker uses the token to remove the label, reopen the issue or delete the file.
-4. Credentials: the attacker gets no credential beyond the installation token of the repository's own account, which
+3. Credentials: the attacker gets no credential beyond the installation token of the session's own account, which
    expires within the hour, and the logins the session itself runs on (Claude Code's, and Codex's for the upkeep
    audits). The App's private key, the owner's credentials and other accounts' tokens stay out of reach.
 
@@ -46,12 +45,20 @@ Not findings:
 
 - A way past `agent-guard.py` or `text-lint.py` on its own. The guard hooks are a best-effort layer above the write
   limit and the runner, not a boundary. Report a gap in them only when you show a boundary above crossed through it.
+- A brake the App lifts. Brakes stop honest work, and the runner keeps an owner's brake on when the App removes it,
+  but a session that gets around that is answered by stopping the machine, not by a fix.
+- What a session leaves for a later session on the machine, such as caches, Claude Code and Codex files, transcripts
+  or what it leaves on a project's Docker daemon, unless it crosses a boundary above.
+- Anything that needs another project on the same machine. Projects on one machine are not kept apart.
 - Anything that only stops work: a brake that holds too long, a machine that stops, a review that does not run.
 - Anything that needs trusted access, as above.
-- Anything that needs a second project on the same machine.
 
 Severity: High when the attacker crosses a boundary with what a session can do. Medium when they need a condition they
 cannot bring about themselves, such as a setting, a timing or a rare repository state.
+
+When a session goes wrong, the owner stops the machine (the `stop` file, or shutting it down), replaces the App's
+private key and signs Claude Code and Codex out of their accounts, checks what merged since the last change they
+trust, and rebuilds the machine with `install.sh` and `triphammer add`.
 
 ## How to review
 

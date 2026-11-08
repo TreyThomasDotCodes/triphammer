@@ -36,7 +36,7 @@
 #     holding the lock now (an earlier run's file, or one from before this run wrote its own), no branch is updated.
 # After a tick in which it merged a pull request into the repository ticket-runner serves (the Triphammer config's REPO), it
 # starts the ticket runner once with $TICKET_RUNNER_START, which sees $TRIPHAMMER_PROJECT (default
-# `systemctl --user start --no-block ticket-runner.service`, or ticket-runner@<project>.service with a project), so an
+# `systemctl --user start --no-block ticket-runner@<project>.service`), so an
 # issue that merge unblocked starts without waiting for the runner's timer. A merge GitHub's auto-merge made first does
 # not count. The brakes are read again just before the start, and a brake or a failed start is logged and skips it;
 # neither fails the tick.
@@ -45,7 +45,7 @@
 # merge can be told apart from GitHub's own.
 # A skip, including a held line or a stall, is logged once when it starts and once when it clears, not on every tick.
 set -euo pipefail
-# Its log and skip files are private to the service user, under systemd (UMask=0077 in merge-when-ready.service) or not.
+# Its log and skip files are private to the service user, under systemd (UMask=0077 in merge-when-ready@.service) or not.
 umask 077
 
 # An armed pull request whose head checks were created longer ago than this and are still queued or running has
@@ -77,11 +77,9 @@ pending_follow_up() {
 # (bin/github-app-token), so the installation repositories below are that account's.
 export GITHUB_APP_OWNER="${served%%/*}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
-# The suffix of the log and skip files, and the runner unit to start: per project when a template unit runs this.
-suffix="" runner_unit=ticket-runner.service
-if [ -n "${TRIPHAMMER_PROJECT:-}" ]; then
-  suffix="-$cfg_project" runner_unit="ticket-runner@$cfg_project.service"
-fi
+# The suffix of the log and skip files, per project when a template unit runs this, and the project's runner unit.
+suffix="" runner_unit="ticket-runner@$cfg_project.service"
+[ -z "${TRIPHAMMER_PROJECT:-}" ] || suffix="-$cfg_project"
 log_file="$state_home/merge-when-ready$suffix.log"
 mkdir -p "$state_home"
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$log_file"; }

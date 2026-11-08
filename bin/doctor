@@ -52,18 +52,6 @@ tool() {
   fi
 }
 
-# One project: a machine serves one project, so a second config in ${XDG_CONFIG_HOME:-~/.config}/triphammer is a
-# problem.
-configs=()
-for config_file in "${XDG_CONFIG_HOME:-$HOME/.config}"/triphammer/*.conf; do
-  [ -f "$config_file" ] || continue
-  config_file="${config_file##*/}" configs+=("${config_file%.conf}")
-done
-if [ ${#configs[@]} -gt 1 ]; then
-  problem "this machine has the configs of several projects (${configs[*]}), but a machine serves one project" \
-    "move all but one of them to machines of their own, each set up with triphammer add (bin/README.md, Several projects)"
-fi
-
 # The units' PATH: Triphammer's units find their tools there, so a tool only on the caller's PATH (nvm's node, say) is
 # missing to them. ticket-runner@'s is taken, as the sessions run under it; merge-when-ready@ and demo-gallery@ build
 # and test nothing. The unit file is Triphammer's, so it is read from Triphammer's checkout (this script's), not the
