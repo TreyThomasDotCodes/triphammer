@@ -8,9 +8,7 @@
 #   triphammer start [<project>]
 #   triphammer update [--dry-run]
 #
-# A machine serves one project. add, --dry-run or not, exits 1 naming the machine's project, before provision-project
-# runs, when the service user's ~/.config/triphammer holds a config whose REPO is not the repository given, or one whose
-# REPO cannot be read, or the directory is there but cannot be listed. Adding the machine's own project again works.
+# A machine serves one or more of the owner's projects; add sets up a further one as it sets up the first.
 #
 # add clones Triphammer's repository (from the machine file) into a temporary directory as the caller, runs that
 # clone's bin/provision-project as root through sudo with the arguments given (which keeps the settings a project's
@@ -213,19 +211,6 @@ as_root() {
   return "$status"
 }
 
-# one_project <owner/name>: stops the script when the service user has a config for a project of another repository
-# than the one given (its REPO, compared as provision-project compares it, ignoring case), or one whose REPO cannot be
-# read: a machine serves one project.
-one_project() {
-  local names name repo others=()
-  config_names
-  for name in "${names[@]}"; do
-    repo="$(as_service sed -n 's/^REPO=//p' "$home/.config/triphammer/$name.conf")" || repo=""
-    [ "${repo,,}" = "${1,,}" ] || others+=("$name")
-  done
-  [ ${#others[@]} -eq 0 ] || fail "this machine serves ${others[*]} already, and one machine serves one project; set $1 up on a machine of its own (bin/README.md, Several projects)"
-}
-
 add() {
   local arg dry_run="" status=0 name
   for arg; do [ "$arg" != --dry-run ] || dry_run=1; done
@@ -233,7 +218,6 @@ add() {
   read_machine
   fresh_clone "triphammer add installs the project's toolchains as root and writes its files as $user" \
     "bin/provision-project sets the project up"
-  one_project "$1"
   as_root provision-project "$@" || status=$?
   [ "$status" -eq 0 ] || exit "$status"
   name="$(sed -n 's/^project: //p' "$work/output" | tail -n 1)"

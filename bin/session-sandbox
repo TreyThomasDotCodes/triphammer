@@ -85,12 +85,12 @@
 # machine file): it stays where it lies, read-only like the rest of the file system, so a daemon that makes it again is
 # still reached, and one in a runtime directory is mounted back into its tmpfs. Without it that socket is hidden as
 # the rootful ones are, unless it lies directly in /. Every other rootless daemon's socket the machine file
-# ($TRIPHAMMER_PROVISION_ROOT/etc/triphammer.conf, rootless_docker_sockets in config.sh) names is hidden the same way:
-# each other Docker project's, and the one daemon they all shared before each had its own. For a path whose directory
+# ($TRIPHAMMER_PROVISION_ROOT/etc/triphammer.conf, rootless_docker_sockets in config.sh), each other Docker project's,
+# is hidden the same way. For a path whose directory
 # is missing, the first missing name on its way is left out of the directory that exists. What the machine adds to
 # such a directory later, other than in an entry mounted back, does not show inside either. What it hides of other
-# projects (their tokens, caches and Docker daemons) is no security boundary: a machine serves one project, and the
-# threat model rests on that (bin/README.md, Several projects).
+# projects (their tokens, caches and Docker daemons) is no security boundary: the threat model does not keep projects
+# on one machine apart (bin/README.md, Several projects).
 # bwrap ends the command when its parent dies (--die-with-parent), and every process left inside when the command
 # exits.
 #
@@ -327,7 +327,7 @@ fi
 hide_sockets=(/var/run/docker.sock /run/docker.sock)
 [ -n "$docker" ] || hide_sockets+=("$docker_host")
 # Every rootless daemon's socket the machine file names but the one a Docker project's DOCKER_HOST names: each other
-# Docker project's own, and the one they all shared before (rootless_docker_sockets in config.sh).
+# Docker project's own (rootless_docker_sockets in config.sh).
 while IFS= read -r path; do
   [ -n "$docker" ] && [ "$(readlink -m -- "$path")" = "$(readlink -m -- "$docker_host")" ] || hide_sockets+=("$path")
 done < <(rootless_docker_sockets)

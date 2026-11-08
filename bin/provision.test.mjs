@@ -139,24 +139,12 @@ test('on a fresh machine it installs everything but a project, and a second run 
   assert.equal(readFileSync(command, 'utf8'), readFileSync(join(here, 'triphammer'), 'utf8'));
 });
 
-test('the daemon every Docker project shared before stays as it is, and the machine file keeps the lines provision does not write', t => {
+test('the machine file keeps the lines provision does not write', t => {
   const m = machine(t, {'example/triphammer': triphammerFiles});
   assert.equal(m.provision(...at(m, tri)).status, 0);
-  // As an earlier provision left it: the shared daemon's user, lingering, unit, socket directory and keys, and a
-  // project's own daemon's keys that provision-project wrote.
-  const state = m.machine();
-  const sharedHome = join(m.root, 'home/triphammer-docker');
-  const unit = join(sharedHome, '.config/systemd/user/docker.service');
-  mkdirSync(dirname(unit), {recursive: true});
-  writeFileSync(unit, '[Service]\nExecStart=/usr/bin/dockerd-rootless.sh\n');
-  const socketDir = join(m.sys, 'var/lib/triphammer-docker');
-  mkdirSync(socketDir, {recursive: true, mode: 0o700});
-  writeFileSync(join(m.state, 'machine.json'), JSON.stringify({...state,
-    users: {...state.users, 'triphammer-docker': {home: sharedHome, groups: ['triphammer-docker']}},
-    linger: [...state.linger, 'triphammer-docker'], enabled: ['triphammer-docker:docker.service']}));
+  // A project's own daemon's keys that provision-project wrote.
   const machineFile = join(m.sys, 'etc/triphammer.conf');
-  const kept = 'TRIPHAMMER_DOCKER_USER=triphammer-docker\nTRIPHAMMER_DOCKER_SOCKET=/var/lib/triphammer-docker/docker.sock\n'
-    + 'TRIPHAMMER_DOCKER_USER_EXAMPLE=triphammer-docker-example\nTRIPHAMMER_DOCKER_SOCKET_EXAMPLE=/var/lib/triphammer-docker-example/docker.sock\n';
+  const kept = 'TRIPHAMMER_DOCKER_USER_EXAMPLE=triphammer-docker-example\nTRIPHAMMER_DOCKER_SOCKET_EXAMPLE=/var/lib/triphammer-docker-example/docker.sock\n';
   const before = readFileSync(machineFile, 'utf8');
   writeFileSync(machineFile, `${before.replace(/^TRIPHAMMER_HOME=.*\n/m, 'TRIPHAMMER_HOME=/elsewhere\n')}${kept}`);
 
@@ -165,12 +153,6 @@ test('the daemon every Docker project shared before stays as it is, and the mach
   assert.deepEqual(changingCalls(result.calls), []);
   assert.match(result.stdout, /^\+ write .*\/etc\/triphammer\.conf$/m);
   assert.equal(readFileSync(machineFile, 'utf8'), `${before}${kept}`);
-  assert.equal(readFileSync(unit, 'utf8'), '[Service]\nExecStart=/usr/bin/dockerd-rootless.sh\n');
-  assert.ok(existsSync(socketDir));
-  const after = m.machine();
-  assert.deepEqual(after.users['triphammer-docker'], {home: sharedHome, groups: ['triphammer-docker']});
-  assert.deepEqual(after.enabled, ['triphammer-docker:docker.service']);
-  assert.ok(!result.calls.some(call => call.join(' ').includes('triphammer-docker')), JSON.stringify(result.calls));
   assert.match(m.provision(...at(m, tri)).stdout, /^Nothing to change/m);
 });
 

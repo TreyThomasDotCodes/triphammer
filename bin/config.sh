@@ -79,15 +79,14 @@ rootless_docker_host() {
   printf 'unix://%s\n' "$socket"
 }
 # rootless_docker_sockets: prints, one per line, the socket of every rootless Docker daemon the machine file names
-# (machine_get TRIPHAMMER_DOCKER_SOCKET_<key> for each key it gives), and the one TRIPHAMMER_DOCKER_SOCKET names, the
-# daemon every Docker project shared before each had its own, each only when it is a plain absolute path.
+# (machine_get TRIPHAMMER_DOCKER_SOCKET_<key> for each key it gives), each only when it is a plain absolute path.
 rootless_docker_sockets() {
   local file line key socket
   local -A seen=()
   file="$(machine_path)"
   [ -r "$file" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
-    [[ "$line" =~ ^(TRIPHAMMER_DOCKER_SOCKET(_[A-Z0-9_]+)?)= ]] || continue
+    [[ "$line" =~ ^(TRIPHAMMER_DOCKER_SOCKET_[A-Z0-9_]+)= ]] || continue
     key="${BASH_REMATCH[1]}"
     [ -z "${seen[$key]:-}" ] || continue
     seen[$key]=1

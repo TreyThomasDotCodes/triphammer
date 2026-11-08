@@ -37,7 +37,6 @@ const files = [
   'bin/fixture.mjs',
   'bin/security-review.test.mjs',
   'bin/ticket-decide.test.mjs',
-  'systemd/ticket-runner.service',
   'bin/ticket-runner.test.mjs',
   'systemd/ticket-runner@.service',
 ];

@@ -336,16 +336,8 @@ test('projects whose composeProjectPatterns cannot match the same Compose name, 
   writeFileSync(join(r.home, '.config/triphammer/fifth-project.conf'), `REPO=Example-Owner/fifth\nCHECKOUT=${join(r.root, 'nowhere')}\n`);
   // The project's own config, by name, is not another project.
   otherProject(r, 'triphammer', '^example-project-(local|it)-[0-9]+$');
-  // The several configs are the one problem: no pair of patterns is reported.
-  assertOneProblem(r.doctor(), /^this machine has the configs of several projects/);
-});
-
-test('two configs on the machine are reported, naming both projects, and one is not', t => {
-  const r = doctorSetup(t);
-  otherProject(r, 'triphammer', null);
-  assert.equal(r.doctor().status, 0);
-  otherProject(r, 'other-project', null);
-  assertOneProblem(r.doctor(), /^this machine has the configs of several projects \(other-project triphammer\), but a machine serves one project\. Fix: move all but one of them to machines of their own, each set up with triphammer add \(bin\/README\.md, Several projects\)$/);
+  const result = r.doctor();
+  assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
 test('without a composeProjectPattern of its own, the project is not compared with others', t => {

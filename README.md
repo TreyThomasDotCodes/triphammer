@@ -29,8 +29,10 @@ Triphammer merges code without a person watching, so several limits apply to eve
 - CI reads those rules from the default branch, never from the pull request, so a pull request can't loosen its own
   tier.
 - A change no rule covers waits for you. A repository with no rules file sends every change to you.
-- Each machine serves one project, and these limits rest on that: none of them is meant to keep two projects on one
-  machine apart. `triphammer add` refuses a second project, and the doctor reports a machine that has more than one.
+- Triphammer is a tool for one developer, on a machine that runs nothing else and that you can rebuild. Its limits
+  protect two things: what merges, and credentials that reach past the machine. They don't keep your projects on one
+  machine apart from each other. If a session goes wrong anyway, you recover the machine (see
+  [If a session goes wrong](#if-a-session-goes-wrong)).
 - Each session Triphammer starts runs under an OS-level write limit that leaves only its clone, the temporary
   directories and the tools' own runtime and cache directories writable. The write limit and the runner hold the
   session's boundaries.
@@ -182,8 +184,7 @@ triphammer start <project>
 and creates any labels Triphammer needs. It then runs the doctor, which lists anything missing and how to fix it. The
 timers aren't on yet, so the doctor skips them until you run `triphammer start`, which turns them on.
 
-A machine serves one project. When the machine already has a different one, `triphammer add` names it and stops
-without changing anything; set the new project up on a machine of its own.
+One machine can serve several of your projects. Run `triphammer add` for each one.
 
 You can run `triphammer add` again at any time. It keeps your existing settings and prints what each one ended up as.
 To change a setting, use `--set KEY=VALUE`, `--modules` or `--app-author`. To remove one, use `--unset KEY`.
@@ -227,6 +228,17 @@ request.
 Each of these also stops a session already working on it. To resume, remove the label, close the issue or delete the
 file.
 
+### If a session goes wrong
+
+The brakes stop honest work. If you think a session did something it shouldn't, such as installing something on the
+machine or acting on text from a dependency or a web page, don't try to clean the machine:
+
+1. Stop it: create the `stop` file, or shut the machine down.
+2. In the GitHub App's settings, generate a new private key and delete the old one.
+3. Sign Claude Code and Codex out of their accounts.
+4. Check what merged since the last change you trust.
+5. Rebuild the machine with the [install](#install) steps and `triphammer add` for each project.
+
 ### See what it's doing
 
 ```sh
@@ -267,8 +279,9 @@ Modules are off unless a project's config lists them in `MODULES`, which `tripha
 - `qwen-audit` repeats the weekly audit with a local model behind an Anthropic Messages API server, for a second
   opinion.
 - `codex` adds Codex to the weekly audit, runs a monthly security audit and reviews the security of pull requests that
-  touch Triphammer's own code. If that review finds something, a repair session starts, and the reviewed commit doesn't
-  merge until that session's follow-up is recorded.
+  touch Triphammer's own code. If that review finds something, a repair session starts, and Triphammer's merge queue
+  doesn't merge the reviewed commit until that session's follow-up is recorded. GitHub's own auto-merge, once armed,
+  doesn't wait for it.
 
 `triphammer add` and `triphammer update` write the `codex` module's defaults into a project's config when they're
 missing:

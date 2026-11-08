@@ -643,21 +643,20 @@ test("a project with Docker reaches its own rootless daemon's socket and no othe
   const r = sandboxRig(t);
   const machine = join(r.root, 'machine');
   mkdirSync(join(machine, 'etc'), {recursive: true});
-  const sockets = {own: join(r.root, 'example-docker-own/docker.sock'), other: join(r.root, 'example-docker-other/docker.sock'),
-    shared: join(r.root, 'example-docker/docker.sock')};
+  const sockets = {own: join(r.root, 'example-docker-own/docker.sock'), other: join(r.root, 'example-docker-other/docker.sock')};
   for (const path of Object.values(sockets)) {
     mkdirSync(dirname(path), {recursive: true});
     await listenUnix(t, path);
   }
-  writeFileSync(join(machine, 'etc/triphammer.conf'), `TRIPHAMMER_USER=example\nTRIPHAMMER_DOCKER_SOCKET=${sockets.shared}\n`
+  writeFileSync(join(machine, 'etc/triphammer.conf'), `TRIPHAMMER_USER=example\n`
     + `TRIPHAMMER_DOCKER_SOCKET_OWN=${sockets.own}\nTRIPHAMMER_DOCKER_SOCKET_OTHER=${sockets.other}\n`);
   const env = {TRIPHAMMER_PROVISION_ROOT: machine, DOCKER_HOST: `unix://${sockets.own}`};
   const reached = docker => Object.entries(sockets).map(([name, path]) => {
     const {output} = r.inside(connect(path), {...env, ...docker});
     return `${name} ${/^connected /m.test(output) ? 'connected' : /FileNotFoundError/.test(output) ? 'hidden' : output}`;
   });
-  assert.deepEqual(reached({TRIPHAMMER_DOCKER: '1'}), ['own connected', 'other hidden', 'shared hidden']);
-  assert.deepEqual(reached({}), ['own hidden', 'other hidden', 'shared hidden']);
+  assert.deepEqual(reached({TRIPHAMMER_DOCKER: '1'}), ['own connected', 'other hidden']);
+  assert.deepEqual(reached({}), ['own hidden', 'other hidden']);
   for (const path of Object.values(sockets)) assert.ok(isSocket(path), `${path} outside is untouched`);
 });
 
