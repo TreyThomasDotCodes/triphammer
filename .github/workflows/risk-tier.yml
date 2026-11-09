@@ -3,9 +3,11 @@ name: risk-tier
 # Classifies the change and posts the required `owner-approval` commit status, whose text says what the pull request
 # needs: auto succeeds; blocked fails; escalate stays pending until the owner approves the current head commit after
 # its latest base change. An approval of an earlier commit still counts while the pull request's own changes against
-# the base are identical (same patch id), so updating the branch from main does not need a new approval. While it
-# waits, the owner's review is (re)requested. A pull request the owner opened counts as approved at each commit the
-# owner pushed to it, since GitHub lets no one approve their own pull request; a commit anyone else pushed to it, such
+# the base are byte-identical (the same full diff), so updating the branch from main does not need a new approval,
+# unless main's changes move or touch the pull request's hunks. While it waits, the owner's review is (re)requested. A
+# pass is posted only while no other open pull request has the same head commit, since the status is the commit's. A
+# pull request the owner opened counts as approved at each commit the owner pushed to it, since GitHub lets no one
+# approve their own pull request; a commit anyone else pushed to it, such
 # as an agent's, still needs the owner, by the same rules as an approval. A hold label, a hold someone other than a bot
 # added until someone other than a bot removes it, or the owner's latest review requesting changes keeps any tier
 # pending. The owner's login matches in any case, as GitHub matches logins
@@ -129,9 +131,21 @@ jobs:
           # Fully qualified: a pushed tag named origin/<branch> must not shadow the remote-tracking ref.
           BASE: refs/remotes/origin/${{ github.event.repository.default_branch }}
         run: |
+          # The status belongs to the head commit, and every pull request at that commit reads it, so a pass is posted
+          # only while this is the one open pull request whose head it is. A failed lookup counts as another.
+          sole_pull_request() {
+            local others
+            others="$(gh api --paginate --slurp "repos/$REPOSITORY/commits/$HEAD_SHA/pulls" \
+              | jq -r --arg head "$HEAD_SHA" --argjson number "$PULL_REQUEST_NUMBER" \
+                '[.[][] | select(.state == "open" and .head.sha == $head and .number != $number)] | length')" || return 1
+            [ "$others" = 0 ]
+          }
           # Posts the owner-approval status (description: at most 140 characters) and ends the job: only a blocked
           # change or a failure fails the job; waiting for the owner is pending, not a failure.
           status() {
+            if [ "$1" = success ] && ! sole_pull_request; then
+              set -- failure "Refused: another open pull request has this head commit; close it or push a new commit"
+            fi
             gh api -X POST "repos/$REPOSITORY/statuses/$HEAD_SHA" -f context=owner-approval -f state="$1" \
               -f description="$2" -f target_url="$RUN_URL" > /dev/null
             echo "owner-approval: $1: $2"
@@ -219,14 +233,19 @@ jobs:
           if [ "$state" = "APPROVED $HEAD_SHA" ]; then
             status success "Escalate: approved by @$OWNER at ${HEAD_SHA:0:7}"
           fi
-          # An approval of an earlier commit counts while the pull request's own changes are byte-identical: the
-          # same patch id for base...approved and base...head. Any change to them, even inside a merge, differs.
-          head_patch="$(git diff "$BASE...$HEAD_SHA" | git patch-id --verbatim | cut -d' ' -f1)"
+          # An approval of an earlier commit counts while the pull request's own changes are byte-identical: the same
+          # full diff, hunk positions included, for base...approved and base...head. Any change to them, even inside a
+          # merge or the same edit made somewhere else in a file, differs.
+          changes() {
+            local diff
+            diff="$(git diff --full-index "$BASE...$1")" && [ -n "$diff" ] && sha256sum <<< "$diff" | cut -d' ' -f1
+          }
+          head_changes="$(changes "$HEAD_SHA")" || head_changes=""
           same_changes() {
-            local patch
+            local mine
             git cat-file -e "$1^{commit}" 2>/dev/null || return 1
-            patch="$(git diff "$BASE...$1" | git patch-id --verbatim | cut -d' ' -f1)"
-            [ -n "$patch" ] && [ "$patch" = "$head_patch" ]
+            mine="$(changes "$1")" || return 1
+            [ -n "$head_changes" ] && [ "$mine" = "$head_changes" ]
           }
           approved="${state#APPROVED }"
           if [ "${state%% *}" = APPROVED ] && same_changes "$approved"; then
