@@ -563,7 +563,8 @@ test('a token file outside the shared tokens directory runs nothing', {skip}, t 
 });
 
 // A shell command that connects to the Unix socket at `path` and prints `connected <path>`, or why it could not.
-const connect = path => `python3 -c "import socket, sys; s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); print('connected', sys.argv[1])" '${path}'`;
+// -I -S: no site hooks, such as Ubuntu's apport excepthook, which prints the error again and again.
+const connect = path => `python3 -I -S -c "import socket, sys; s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); print('connected', sys.argv[1])" '${path}'`;
 
 test("under the limit, the runtime directory's bus and agent sockets cannot be reached and their variables are gone; a rootless Docker socket there can", {skip: skipOutside}, async t => {
   const r = sandboxRig(t);
