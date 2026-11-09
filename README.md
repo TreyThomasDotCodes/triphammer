@@ -195,7 +195,8 @@ The Configuration section of [`bin/README.md`](bin/README.md#configuration) list
 
 When a pull request escalates, Triphammer requests your review and labels it `needs-owner`. Approve it on GitHub to let
 it merge. If its changes move after you approve, it needs your approval again. To send it back, request changes, and a
-new session works through your review.
+new session works through your review. `owner-approval` belongs to the head commit, so it fails while two open pull
+requests share one: close one, or push a new commit to it.
 
 A pull request you open yourself, such as a change under `.github/workflows/` that the App can't push, needs no
 approval: `owner-approval` passes at any commit you pushed. If someone else pushes to its branch, that commit waits for
