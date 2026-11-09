@@ -257,8 +257,9 @@ test('serves a stale cached value while one refresh runs', async () => {
 });
 
 /** Builds a small state directory with a held lock and a running ticket. */
-function stateDir() {
+function stateDir(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'triphammer-status-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
   fs.mkdirSync(path.join(dir, 'runs'));
   const run = '20260102T130000Z-ticket-9';
   fs.writeFileSync(path.join(dir, 'runs', `${run}.jsonl`),
@@ -365,8 +366,8 @@ function countingPlan() {
   return {counter, plan};
 }
 
-test('the status page shows the held run, the queue from the files, and degrades when gh fails', async () => {
-  const {dir, run} = stateDir();
+test('the status page shows the held run, the queue from the files, and degrades when gh fails', async t => {
+  const {dir, run} = stateDir(t);
   await withServer(dir, async get => {
     const page = await get('/');
     assert.equal(page.status, 200);
@@ -380,9 +381,9 @@ test('the status page shows the held run, the queue from the files, and degrades
   });
 });
 
-test('while the runner holds its lock the plan is not asked for, so it cannot collide with the run', async () => {
+test('while the runner holds its lock the plan is not asked for, so it cannot collide with the run', async t => {
   // --plan rewrites issues.json and prs.json and fetches the main checkout; during a run it only names the running ticket.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   const {counter, plan} = countingPlan();
   await withServer(dir, async get => {
     const page = await get('/');
@@ -392,9 +393,9 @@ test('while the runner holds its lock the plan is not asked for, so it cannot co
   }, {plan});
 });
 
-test('with gh failing the page does not claim there is no stop-agents label', async () => {
+test('with gh failing the page does not claim there is no stop-agents label', async t => {
   // The fallback files can predate a stop-agents label, so its absence there proves nothing.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const page = await get('/');
@@ -403,9 +404,9 @@ test('with gh failing the page does not claim there is no stop-agents label', as
   });
 });
 
-test('a stop-agents label gh reports pauses the page even while the runner\'s files are fresh and unlabelled', async () => {
+test('a stop-agents label gh reports pauses the page even while the runner\'s files are fresh and unlabelled', async t => {
   // The runner exits on stop-agents before rewriting issues.json, so the fresh file still holds pre-brake labels.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   let plans = 0;
   await withServer(dir, async get => {
     const page = await get('/');
@@ -422,9 +423,9 @@ test('a stop-agents label gh reports pauses the page even while the runner\'s fi
   });
 });
 
-test('a Stop-Agents label in any case pauses the page, and brake labels in any case get the brake badge', async () => {
+test('a Stop-Agents label in any case pauses the page, and brake labels in any case get the brake badge', async t => {
   // GitHub matches label names in any case, and so does the runner.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   await withServer(dir, async get => {
     const page = await get('/');
     assert.match(page.body, /Paused: stop-agents on #9/);
@@ -440,9 +441,9 @@ test('a Stop-Agents label in any case pauses the page, and brake labels in any c
   });
 });
 
-test('a held lock with an unended start older than the lock holder is busy, not that old run', async () => {
+test('a held lock with an unended start older than the lock holder is busy, not that old run', async t => {
   // A killed run leaves a start line with no end; the runner takes its lock on every timer start before logging.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   startHolder(dir, '2026-01-05T08:00:00Z');
   await withServer(dir, async get => {
     const page = await get('/');
@@ -452,8 +453,8 @@ test('a held lock with an unended start older than the lock holder is busy, not 
   });
 });
 
-test('without the holder\'s start time, or without the lock table, only a start within 6 h counts as running', () => {
-  const {dir, run} = stateDir();
+test('without the holder\'s start time, or without the lock table, only a start within 6 h counts as running', t => {
+  const {dir, run} = stateDir(t);
   const config = {stateDir: dir, procRoot: path.join(dir, 'proc')};
   fs.rmSync(path.join(dir, 'proc', '4242'), {recursive: true});
   assert.equal(readRuns(config, Date.parse('2026-01-02T18:59:00Z')).activeName, run);
@@ -477,8 +478,8 @@ test('the latest start with no end is the fallback active run; an earlier killed
   assert.equal(readRuns(config, nowMs).active, null);
 });
 
-test('a released lock means idle even with an unended start line', async () => {
-  const {dir} = stateDir();
+test('a released lock means idle even with an unended start line', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   const {counter, plan} = countingPlan();
   await withServer(dir, async get => {
@@ -491,8 +492,8 @@ test('a released lock means idle even with an unended start line', async () => {
   }, {plan});
 });
 
-test('with gh answering and no brake the page says there are none', async () => {
-  const {dir} = stateDir();
+test('with gh answering and no brake the page says there are none', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const page = await get('/');
@@ -500,8 +501,8 @@ test('with gh answering and no brake the page says there are none', async () => 
   }, {titles: async () => ({value: {issues: ok([{number: 9, title: 'Nine', labels: []}]), prs: ok([])}, at: Date.now()})});
 });
 
-test('the transcript view escapes content and 404s anything but an existing run name', async () => {
-  const {dir, run} = stateDir();
+test('the transcript view escapes content and 404s anything but an existing run name', async t => {
+  const {dir, run} = stateDir(t);
   assert.equal(listRuns(path.join(dir, 'runs')).length, 1);
   await withServer(dir, async get => {
     const page = await get(`/run/demo/${run}`);
@@ -517,9 +518,9 @@ test('the transcript view escapes content and 404s anything but an existing run 
   });
 });
 
-test('only requests addressed to the listen address or an allowed name are served; others get 421', async () => {
+test('only requests addressed to the listen address or an allowed name are served; others get 421', async t => {
   // A page that rebinds its own name to this address sends its own name as Host, so it is refused.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const foreign = await get('/', 'GET', 'evil.example');
@@ -573,8 +574,8 @@ function waitingSection(body) {
 /** @param {string} section */
 const rowHeads = section => [...section.matchAll(/<li><span class="project">[^<]*<\/span> (?:<a href="([^"]+)">|<span class="bad">(Brake))/g)].map(match => match[1] ?? match[2]);
 
-test('Waiting on you lists brakes first, then every kind of row oldest waiting first, with links and ages', async () => {
-  const {dir} = stateDir();
+test('Waiting on you lists brakes first, then every kind of row oldest waiting first, with links and ages', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const section = waitingSection((await get('/')).body);
@@ -603,9 +604,9 @@ test('Waiting on you lists brakes first, then every kind of row oldest waiting f
   }, {titles: waitingGh().titles});
 });
 
-test('Waiting on you reads the hold, needs-owner and stop-agents labels and their label events in any case', async () => {
+test('Waiting on you reads the hold, needs-owner and stop-agents labels and their label events in any case', async t => {
   // The items' labels are capitalized and the events' upper case, so each is compared without regard to case.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   const {fixture} = waitingGh();
   const capitalized = (/** @type {string} */ name) => name.replace(/(^|-)(\w)/g, (_, dash, letter) => dash + letter.toUpperCase());
@@ -632,10 +633,10 @@ test('Waiting on you reads the hold, needs-owner and stop-agents labels and thei
   }, {titles: async () => ({value: {issues: ok(fixture.issues), prs: ok(fixture.prs), labelEvents: ok(fixture.labelEvents)}, at: Date.now()})});
 });
 
-test('a pull request waits for approval exactly when the risk-tier workflow posted an escalate status on its head', async () => {
+test('a pull request waits for approval exactly when the risk-tier workflow posted an escalate status on its head', async t => {
   // 40 and 41 change a test file and 42 is a rename into src/ out of Triphammer, which a tier worked out from gh's file
   // list would get wrong; 40 is still being classified and 43 has no status yet, so neither is called escalate.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const section = waitingSection((await get('/')).body);
@@ -645,8 +646,8 @@ test('a pull request waits for approval exactly when the risk-tier workflow post
   }, {titles: waitingGh('waiting-tiers-gh.json').titles});
 });
 
-test('an escalate note links only to http(s) pages on github.com', async () => {
-  const {dir} = stateDir();
+test('an escalate note links only to http(s) pages on github.com', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   const {fixture} = waitingGh('waiting-tiers-gh.json');
   const status = fixture.labelEvents.data.repository.approvals.nodes.find((/** @type {any} */ node) => node.number === 42).commits.nodes[0].commit.status.context;
@@ -661,9 +662,9 @@ test('an escalate note links only to http(s) pages on github.com', async () => {
   }
 });
 
-test('an unarmed pull request behind its base is green, not armed, exactly when every latest check on its head passed', async () => {
+test('an unarmed pull request behind its base is green, not armed, exactly when every latest check on its head passed', async t => {
   // merge-when-ready only updates armed pull requests, so an unarmed green one goes BEHIND as soon as main moves.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   const run = (/** @type {string} */ conclusion, /** @type {string} */ startedAt) =>
     ({__typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion, startedAt, completedAt: startedAt});
@@ -690,8 +691,8 @@ test('an unarmed pull request behind its base is green, not armed, exactly when 
   }, {titles: async () => ({value: {issues: ok([]), prs: ok(prs), labelEvents}, at: Date.now()})});
 });
 
-test('a stop file and a backoff in force come first in Waiting on you', async () => {
-  const {dir} = stateDir();
+test('a stop file and a backoff in force come first in Waiting on you', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   fs.writeFileSync(path.join(dir, 'stop'), '');
   fs.writeFileSync(path.join(dir, 'backoff'), String(Math.floor(Date.now() / 1000) + 3600));
@@ -705,8 +706,8 @@ test('a stop file and a backoff in force come first in Waiting on you', async ()
   }, {titles: waitingGh().titles});
 });
 
-test('without label events, labelled items count from when they were opened, and the page says so', async () => {
-  const {dir} = stateDir();
+test('without label events, labelled items count from when they were opened, and the page says so', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   const {fixture} = waitingGh();
   await withServer(dir, async get => {
@@ -719,8 +720,8 @@ test('without label events, labelled items count from when they were opened, and
   }, {titles: async () => ({value: {issues: ok(fixture.issues), prs: ok(fixture.prs), labelEvents: {ok: /** @type {const} */ (false), error: 'gh: no'}}, at: Date.now()})});
 });
 
-test('an empty queue shows exactly one line saying nothing is waiting', async () => {
-  const {dir} = stateDir();
+test('an empty queue shows exactly one line saying nothing is waiting', async t => {
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const section = waitingSection((await get('/')).body);
@@ -728,9 +729,9 @@ test('an empty queue shows exactly one line saying nothing is waiting', async ()
   }, {titles: async () => ({value: {issues: ok([{number: 9, title: 'Nine', labels: [], body: ''}]), prs: ok([]), labelEvents: ok({data: {repository: {issues: {nodes: []}, pullRequests: {nodes: []}}}})}, at: Date.now()})});
 });
 
-test('with gh failing Waiting on you does not claim the queue is empty', async () => {
+test('with gh failing Waiting on you does not claim the queue is empty', async t => {
   // The runner's files can predate a label, so they cannot prove nothing is waiting.
-  const {dir} = stateDir();
+  const {dir} = stateDir(t);
   release(dir);
   await withServer(dir, async get => {
     const section = waitingSection((await get('/')).body);
@@ -766,14 +767,14 @@ const oneDecision = () => ({value: {
  * Two projects, alpha and beta, each with a state directory like stateDir()'s; the fake /proc is alpha's, so only alpha
  * holds its lock.
  */
-function twoProjects() {
-  const alpha = stateDir();
-  const beta = stateDir();
+function twoProjects(t) {
+  const alpha = stateDir(t);
+  const beta = stateDir(t);
   return {alpha, beta, all: {sharedDir: path.join(alpha.dir, 'shared'), procRoot: path.join(alpha.dir, 'proc'), projects: [project('alpha', alpha.dir), project('beta', beta.dir)]}};
 }
 
-test('with two projects Waiting on you is one list with rows from both, each naming its project, and counts exactly its rows', async () => {
-  const {all} = twoProjects();
+test('with two projects Waiting on you is one list with rows from both, each naming its project, and counts exactly its rows', async t => {
+  const {all} = twoProjects(t);
   await withMachine(all, async get => {
     const body = (await get('/')).body;
     const section = waitingSection(body);
@@ -795,7 +796,7 @@ test('with two projects Waiting on you is one list with rows from both, each nam
 });
 
 test('a project whose state directory or config cannot be read shows its error in its own section and the others render', async t => {
-  const {alpha, all} = twoProjects();
+  const {alpha, all} = twoProjects(t);
   const missing = path.join(alpha.dir, 'no-such-state');
   const file = path.join(alpha.dir, 'log');
   all.projects = [all.projects[0], project('beta', missing), project('delta', file),
@@ -820,8 +821,8 @@ test('a project whose state directory or config cannot be read shows its error i
   }, {alpha: {titles: async () => oneDecision()}});
 });
 
-test('gh failing for one project is said in its own area only, and the other project\'s rows are still listed', async () => {
-  const {all} = twoProjects();
+test('gh failing for one project is said in its own area only, and the other project\'s rows are still listed', async t => {
+  const {all} = twoProjects(t);
   await withMachine(all, async get => {
     const body = (await get('/')).body;
     const section = waitingSection(body);
@@ -835,8 +836,8 @@ test('gh failing for one project is said in its own area only, and the other pro
   }, {beta: {titles: async () => oneDecision()}});
 });
 
-test('Triphammer\'s stop file and backoff are listed once, first, then each project\'s own brakes, and pause every project', async () => {
-  const {alpha, beta, all} = twoProjects();
+test('Triphammer\'s stop file and backoff are listed once, first, then each project\'s own brakes, and pause every project', async t => {
+  const {alpha, beta, all} = twoProjects(t);
   fs.mkdirSync(all.sharedDir);
   fs.writeFileSync(path.join(all.sharedDir, 'stop'), '');
   fs.writeFileSync(path.join(all.sharedDir, 'backoff'), String(Math.floor(Date.now() / 1000) + 3600));
@@ -859,8 +860,8 @@ test('Triphammer\'s stop file and backoff are listed once, first, then each proj
   }, {alpha: {plan}, beta: {plan}});
 });
 
-test('transcript links carry the project and resolve only within that project\'s state directory', async () => {
-  const {alpha, beta, all} = twoProjects();
+test('transcript links carry the project and resolve only within that project\'s state directory', async t => {
+  const {alpha, beta, all} = twoProjects(t);
   fs.writeFileSync(path.join(beta.dir, 'runs', `${beta.run}.jsonl`), '{"type":"assistant","message":{"content":[{"type":"text","text":"beta says hi"}]}}\n');
   const betaOnly = '20260103T100000Z-repair-4';
   fs.writeFileSync(path.join(beta.dir, 'runs', `${betaOnly}.jsonl`), '');
