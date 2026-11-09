@@ -2482,8 +2482,11 @@ test('a run killed mid-session frees its slot for a later tick', t => {
 pkill -KILL -P "$pid"
 kill -KILL "$pid"
 `);
+  // A killed runner's EXIT trap never runs, so its temporary directory goes under the test's root, which the test removes.
+  const scratch = join(p.root, 'tmp');
+  mkdirSync(scratch);
   // Short sleeps, as an orphaned watcher's or token refresher's sleep holds the tick's output open until it ends.
-  assert.throws(() => p.a.tick({...brakeEnv, TICKET_RUNNER_TOKEN_SECONDS: '0.1', DURING_SESSION: kill}),
+  assert.throws(() => p.a.tick({...brakeEnv, TICKET_RUNNER_TOKEN_SECONDS: '0.1', DURING_SESSION: kill, TMPDIR: scratch}),
     error => error.signal === 'SIGKILL');
   assert.equal(p.a.runs(), 1);
   p.b.tick({DURING_SESSION: p.c.tickCommand()});
